@@ -9,7 +9,7 @@ body {
   font-family: Arial, sans-serif;
   margin: 0;
   padding: 0;
-  background-image: url('/background.jpg');
+  background-image: url('./components/background.png');
   background-size: cover;
   background-attachment: fixed;
 }
@@ -81,4 +81,41 @@ h1 {
 
 .reset-button:hover {
   background-color: #c82333;
+}
+
+/* Styling for the header title */
+.header-title {
+  font-family: 'Garamond', 'Georgia', serif; /* Fancy cursive font for elegance */
+  font-size: 3rem; /* Large font size for prominence */
+  color: #ffffff; /* White text to contrast with the background */
+  text-align: center; /* Center-align the header text */
+  margin-top: 20px; /* Add spacing from the top */
+  text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5); /* Subtle shadow for depth */
+  animation: fadeIn 2s ease-out; /* Smooth fade-in animation */
+}
+
+/* Responsive styling for smaller screens */
+@media screen and (max-width: 768px) {
+  .header-title {
+    font-size: 2rem; /* Adjust font size for smaller screens */
+    margin-top: 10px;
+    text-shadow: none; /* Remove shadow for simpler design on small screens */
+  }
+
+  .header-container {
+    padding: 40px;
+    border-radius: 5px;
+  }
+}
+
+/* Animation keyframes for fade-in effect */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px); /* Slide in from above */
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

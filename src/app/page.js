@@ -82,8 +82,8 @@ export default function Home() {
   // If no token, show the email form
   return (
     <div className="welcome-container">
-      <h1>Your Personalized Cover Letter Generator</h1>
-      <p className="subtitle">Generate professional cover letters in seconds</p>
+      <h1>Generate professional cover letters in seconds</h1>
+      {/* <p className="subtitle">Generate professional cover letters in seconds</p> */}
       
       <form onSubmit={handleSubmit} className="email-form">
         <input
