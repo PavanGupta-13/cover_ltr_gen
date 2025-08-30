@@ -52,7 +52,7 @@ export default function Home() {
     // Store all user data
     localStorage.setItem('userData', JSON.stringify(formData));
     localStorage.setItem('userToken', generatedToken);
-    localStorage.setItem('usesRemaining', 5); // Set initial usage limit
+    localStorage.setItem('usesRemaining', 1); // Set initial usage limit
     
     // Redirect with token
     router.push(`?token=${generatedToken}`);
@@ -130,7 +130,7 @@ export default function Home() {
       </form>
       
       <p className="disclaimer">
-        You'll get 5 free cover letters. No credit card required.
+        You'll get 1 free cover letter. No credit card required.
       </p>
     </div>
   );

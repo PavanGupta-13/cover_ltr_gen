@@ -12,7 +12,7 @@ const InputForm = () => {
   const [resumeUploaded, setResumeUploaded] = useState(false);
   const [generatedResponse, setGeneratedResponse] = useState(null);
   const [error, setError] = useState(null);
-  const [usesRemaining, setUsesRemaining] = useState(5);
+  const [usesRemaining, setUsesRemaining] = useState(1);
   const [showPaymentPrompt, setShowPaymentPrompt] = useState(false);
 
   useEffect(() => {
