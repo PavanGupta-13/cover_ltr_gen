@@ -1,204 +1,183 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import './InputForm.css';
-import jsPDF from 'jspdf';
-import { pdfToText } from 'pdf-ts';
+import "./InputForm.css";
+import React, { useState } from "react";
+import jsPDF from "jspdf";
+import { pdfToText } from "pdf-ts";
+import { useAuth } from "../contexts/AuthContext";
 
-const InputForm = () => {
+export default function InputForm() {
+  const { token, user, fetchUserProfile } = useAuth();
   const [resumeFile, setResumeFile] = useState(null);
-  const [resumeText, setResumeText] = useState('');
-  const [jobDescription, setJobDescription] = useState('');
-  const [resumeUploaded, setResumeUploaded] = useState(false);
+  const [resumeText, setResumeText] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
   const [generatedResponse, setGeneratedResponse] = useState(null);
   const [error, setError] = useState(null);
-  const [usesRemaining, setUsesRemaining] = useState(1);
   const [showPaymentPrompt, setShowPaymentPrompt] = useState(false);
+  const [showBuyKey, setShowBuyKey] = useState(false);
+  const [customKey, setCustomKey] = useState("");
+  const [byokError, setByokError] = useState("");
+  const [downloading, setDownloading] = useState(false);
 
-  useEffect(() => {
-    // Get remaining uses from localStorage
-    const storedUses = localStorage.getItem('usesRemaining');
-    if (storedUses) {
-      setUsesRemaining(parseInt(storedUses));
-    }
-  }, []);
-
-  const handleFileChange = (event) => {
-    const file = event.target.files[0];
+  // Handle resume upload and parsing
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
     setResumeFile(file);
-    setResumeUploaded(true);
-    handleResumeUpload(file);
-  };
-
-  const handleJobDescriptionChange = (event) => {
-    setJobDescription(event.target.value);
-  };
-
-  const handleResumeUpload = async (file) => {
-    try {
-      let extractedText = '';
-      if (file.type === 'application/pdf') {
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        extractedText = await pdfToText(buffer);
-      } else {
-        const fileReader = new FileReader();
-        fileReader.readAsText(file);
-        await new Promise((resolve) => {
-          fileReader.onload = () => {
-            extractedText = fileReader.result;
-            resolve();
-          };
-        });
-      }
-      setResumeText(extractedText);
-      localStorage.setItem('resumeText', extractedText);
-    } catch (error) {
-      setError('Failed to read resume file.');
-      console.error('Error:', error);
+    let extractedText = "";
+    if (file.type === "application/pdf") {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      extractedText = await pdfToText(buffer);
+    } else {
+      extractedText = await file.text();
     }
+    setResumeText(extractedText);
   };
 
+  // Submit cover letter generation
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setError("");
+    setGeneratedResponse('')
+    if (!jobDescription.trim())
+      return setError("Please enter a job description.");
+    if (!resumeText) return setError("No resume uploaded.");
 
-    // Check if user has uses remaining
-    if (usesRemaining <= 0) {
+    // Quota enforcement for STANDARD MODE only
+    if (user.mode !== 'byok' && (user?.quota ?? 0) <= 0) {
       setShowPaymentPrompt(true);
       return;
     }
-
-    if (!jobDescription.trim()) {
-      setError('Please enter a job description.');
-      return;
-    }
-
-    const storedResumeText = localStorage.getItem('resumeText');
-    if (!storedResumeText || storedResumeText.trim() === '') {
-      setError('No resume uploaded. Please upload a resume first.');
-      return;
-    }
-
     try {
       const prompt = `Assume you are well-versed in job application processes and crafting professional cover letters. Given the attached job description and resume, generate a formal cover letter tailored for the specified position. The cover letter should follow a professional business letter format with the following structure: 1. **Introduction:** Include a formal greeting, state the position applied for, mention how the position was discovered, and briefly express enthusiasm for the opportunity. 2. **Body:** Highlight relevant skills, experiences, and qualifications that align with the job requirements. Focus on transferable skills if there is any gap between the resume and job requirements. 3. **Closing:** Express gratitude, indicate interest in discussing the role further, and include a professional sign-off. **Important Formatting Guidelines:** - Do not include placeholders, variable markers, or template references such as '[Job Listing Source]' or '[Company Name]'. - Do not include section headings like "Introduction," "Body," or "Closing." - Email and LinkedIn URLs should be presented as plain text without square brackets or hyperlink tags. - Exclude duplicate content such as the applicant's contact information, date. - Ensure the content is concise, aligned properly, and does not include analysis or commentary about the generated content. - Provide only the main content of the cover letter, formatted for direct insertion into a PDF, without introductory explanations or extra meta-information. - Donot include additional information in the closing part, except for greetings and candidate name`;
+      const res = await fetch(
+        "http://localhost:3001/api/coverletter/generate",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ prompt, resumeText, jobDescription }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) return setError(data.message || "Generation failed.");
+      setGeneratedResponse(data);
+      // Refresh quota or BYOK info from backend
+      await fetchUserProfile();
+      setJobDescription("");
+    } catch (e) {
+      setError("Error contacting server");
+    }
+  };
 
-      // Use the API route to keep API key secure server-side
-      const response = await fetch('/api/generate', {
-        method: 'POST',
+  // Handle Stripe payment redirect (upgrade standard)
+  const handleUpgrade = () => {
+    window.location.href = "https://buy.stripe.com/test_YOUR_PRODUCT_ID";
+  };
+
+  // Handle BYOK (Bring Your Own Key)
+  const handleBYOK = async (e) => {
+    e.preventDefault();
+    setByokError("");
+    if (!customKey.trim()) {
+      setByokError("Please enter a valid API key.");
+      return;
+    }
+    // You should charge here before enabling BYOK!
+    try {
+      const res = await fetch("http://localhost:3001/api/auth/use-endpoint-key", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          prompt,
-          resumeText: storedResumeText,
-          jobDescription,
-        }),
+        body: JSON.stringify({ customApiKey: customKey }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        setError(`HTTP error! Status: ${response.status}. Error details: ${errorData.error}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setByokError(data.message || "Failed to enable BYOK.");
         return;
       }
-
-      const data = await response.json();
-      setGeneratedResponse(data);
-      generatePDF(data);
-      
-      // Decrement and update uses remaining
-      const newUsesRemaining = usesRemaining - 1;
-      setUsesRemaining(newUsesRemaining);
-      localStorage.setItem('usesRemaining', newUsesRemaining);
-      
-      setJobDescription(''); // Clear the job description text box
-      setError(null);
-    } catch (error) {
-      setError('Failed to generate response.');
-      console.error('Error:', error);
+      setShowBuyKey(false);
+      setShowPaymentPrompt(false);
+      setCustomKey("");
+      setResumeFile(null)
+      setJobDescription("")
+      await fetchUserProfile();
+    } catch {
+      setByokError("Error updating your key.");
     }
   };
 
-  const handleUpgrade = () => {
-    // Redirect to Stripe checkout
-    window.location.href = 'https://buy.stripe.com/test_YOUR_PRODUCT_ID';
-  };
+  // Generate and download PDF using jsPDF
+  const handleDownloadPDF = () => {
+    if (!generatedResponse) return;
+    setDownloading(true);
+    try {
+      const userDetails = user || {};
+      const filename =
+        prompt("Enter filename for the cover letter (e.g., MyCoverLetter):") ||
+        "MyCoverLetter";
+      const doc = new jsPDF("p", "pt", "a4");
+      doc.setFont("helvetica", "normal");
+      const marginLeft = 50;
+      const contentWidth = 500;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${userDetails.fullName || ""}`, marginLeft, 50);
+      doc.setFont("helvetica", "normal");
+      if (userDetails.address)
+        doc.text(`${userDetails.address}`, marginLeft, 65);
+      if (userDetails.phone) doc.text(`${userDetails.phone}`, marginLeft, 80);
+      if (userDetails.email) doc.text(`${userDetails.email}`, marginLeft, 95);
+      if (userDetails.linkedin)
+        doc.text(`${userDetails.linkedin}`, marginLeft, 110);
+      const today = new Date().toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      doc.text(today, marginLeft, 140);
 
-  const generatePDF = (data) => {
-    const userDetails = JSON.parse(localStorage.getItem('userData'))
-    const filename = prompt('Enter a filename for the cover letter (e.g., MyCoverLetter):');
-    if (!filename) return; // Exit if no filename is provided
-
-    const doc = new jsPDF('p', 'pt', 'a4');
-    doc.setFont('helvetica', 'normal');
-
-    // Set margins and content width
-    const marginLeft = 50;
-    const contentWidth = 500;
-
-    // Add contact information only once
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    
-    // Use stored user email or default name
-    const userEmail = localStorage.getItem('userEmail') || 'User';
-    doc.text(`${userDetails.fullName}`, marginLeft, 50);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${userDetails.address}`, marginLeft, 65);
-    doc.text(`${userDetails.phone}`, marginLeft, 80);
-    doc.text(`${userEmail}`, marginLeft, 95);
-    doc.text(`${userDetails.linkedin}`, marginLeft, 110);
-
-    // Add date dynamically (once)
-    const today = new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    doc.text(today, marginLeft, 140);
-
-    // Extract and format cover letter content
-    let coverLetterText = data.choices[0].message.content;
-
-    // Handle bold formatting by replacing ** with markers
-    coverLetterText = coverLetterText.replace(/\*\*(.*?)\*\*/g, (match, p1) => {
-      return `@@${p1}@@`; // Mark bold sections temporarily
-    });
-
-    let yPosition = 195;
-
-    // Split content into paragraphs for proper formatting
-    const paragraphs = coverLetterText.split('\n\n');
-    for (const paragraph of paragraphs) {
-      const lines = doc.splitTextToSize(paragraph, contentWidth);
-      for (const line of lines) {
-        if (yPosition > 780) {
-          // Add new page if content exceeds page limit
-          doc.addPage();
-          yPosition = 50;
-        }
-
-        // Apply bold formatting to marked text
-        const boldParts = line.split('@@');
-        for (let i = 0; i < boldParts.length; i++) {
-          if (i % 2 === 1) {
-            doc.setFont('helvetica', 'bold');
-            doc.text(boldParts[i], marginLeft, yPosition, { align: 'justify' });
-            doc.setFont('helvetica', 'normal');
-          } else {
-            doc.text(boldParts[i], marginLeft, yPosition, { align: 'justify' });
+      let coverLetterText =
+        generatedResponse.coverLetter ||
+        generatedResponse.choices?.[0]?.message?.content ||
+        "";
+      coverLetterText = coverLetterText.replace(
+        /\*\*(.*?)\*\*/g,
+        (m, p) => `@@${p}@@`
+      );
+      let yPosition = 195;
+      const paragraphs = coverLetterText.split("\n\n");
+      for (const paragraph of paragraphs) {
+        const lines = doc.splitTextToSize(paragraph, contentWidth);
+        for (const line of lines) {
+          if (yPosition > 780) {
+            doc.addPage();
+            yPosition = 50;
           }
+          const boldParts = line.split("@@");
+          for (let i = 0; i < boldParts.length; i++) {
+            if (i % 2 === 1) {
+              doc.setFont("helvetica", "bold");
+              doc.text(boldParts[i], marginLeft, yPosition, {
+                align: "justify",
+              });
+              doc.setFont("helvetica", "normal");
+            } else {
+              doc.text(boldParts[i], marginLeft, yPosition, {
+                align: "justify",
+              });
+            }
+          }
+          yPosition += 15;
         }
-        yPosition += 15;
+        yPosition += 10;
       }
-      yPosition += 10; // Add spacing between paragraphs
-    }
-
-    // Save the final PDF with the user-provided filename
-    if (filename.includes('.pdf')) {
-      doc.save(filename);
-    } else {
-      doc.save(`${filename}.pdf`);
+      doc.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -207,50 +186,90 @@ const InputForm = () => {
       {showPaymentPrompt ? (
         <div className="payment-prompt">
           <h2>You've used all your free cover letters</h2>
-          <p>Upgrade now to generate unlimited cover letters for just $5/month.</p>
+          <p className="disclaimer">Upgrade to generate unlimited cover letters.</p>
           <button onClick={handleUpgrade} className="upgrade-button">
-            Upgrade Now
+            Buy More (Standard)
           </button>
-          <button 
-            onClick={() => setShowPaymentPrompt(false)} 
+          <button
+            onClick={() => setShowBuyKey(true)}
+            className="upgrade-button alt"
+          >
+            Enter Your Own Endpoint Key (BYOK)
+          </button>
+          <button
+            onClick={() => setShowPaymentPrompt(false)}
             className="cancel-button"
           >
             Cancel
           </button>
+          {showBuyKey && (
+            <form className="byok-form" onSubmit={handleBYOK}>
+              <input
+                type="text"
+                placeholder="Enter your AI API Key"
+                value={customKey}
+                onChange={e => setCustomKey(e.target.value)}
+                className="input"
+                autoFocus
+                required
+              />
+              <button>Activate BYOK</button>
+              {byokError && <div className="error">{byokError}</div>}
+            </form>
+          )}
         </div>
       ) : (
         <>
           <div className="uses-counter">
-            <p>Cover letters remaining: <span>{usesRemaining}</span></p>
+            {user.mode === "byok" ? (
+              <p>BYOK Mode: Using your own API key.</p>
+            ) : (
+              <p>
+                Cover letters remaining: <span>{user?.quota ?? 0}</span>
+              </p>
+            )}
           </div>
-          <form onSubmit={handleSubmit}>
-            <input
-              type="file"
-              onChange={handleFileChange}
-              disabled={resumeUploaded}
-              required
-            />
+          <form className="generator-form" onSubmit={handleSubmit}>
+            <div className="resume-upload">
+              <input
+                type="file"
+                id="resumeInput"
+                onChange={handleFileChange}
+                required
+                style={{ display: "none" }}
+                accept=".pdf"
+              />
+              <label htmlFor="resumeInput" className="resume-upload-btn">
+                Choose Your Resume
+              </label>
+              {resumeFile && (
+                <div className="resume-filename">{resumeFile.name}</div>
+              )}
+            </div>
             <textarea
               placeholder="Enter Job Description"
               value={jobDescription}
-              onChange={handleJobDescriptionChange}
-              required
+              onChange={(e) => setJobDescription(e.target.value)}
               rows={10}
-              cols={50}
+              required
             />
             <button type="submit">Generate Cover Letter</button>
           </form>
           {error && <p className="error">{error}</p>}
           {generatedResponse && (
             <div className="generated-response">
-              <h2>Generated Response:</h2>
-              <p>Cover Letter: {generatedResponse.choices[0].message.content}</p>
+              <h2>Generated Cover Letter</h2>
+              <button
+                className="download-btn"
+                onClick={handleDownloadPDF}
+                disabled={downloading}
+              >
+                {downloading ? "Preparing PDF..." : "Download as PDF"}
+              </button>
             </div>
           )}
         </>
       )}
     </div>
   );
-};
-
-export default InputForm;
+}
