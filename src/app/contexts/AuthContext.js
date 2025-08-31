@@ -39,7 +39,7 @@ export function AuthProvider({ children }) {
 
   // Fetch user profile/quota (on login, refresh, etc)
   const fetchUserProfile = async (freshToken = token) => {
-    const response = await fetch('http://localhost:3001/api/auth/profile', {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/profile`, {
       headers: { Authorization: `Bearer ${freshToken}` }
     });
     if (!response.ok) return logout();

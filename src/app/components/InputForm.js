@@ -50,7 +50,7 @@ export default function InputForm() {
     try {
       const prompt = `Assume you are well-versed in job application processes and crafting professional cover letters. Given the attached job description and resume, generate a formal cover letter tailored for the specified position. The cover letter should follow a professional business letter format with the following structure: 1. **Introduction:** Include a formal greeting, state the position applied for, mention how the position was discovered, and briefly express enthusiasm for the opportunity. 2. **Body:** Highlight relevant skills, experiences, and qualifications that align with the job requirements. Focus on transferable skills if there is any gap between the resume and job requirements. 3. **Closing:** Express gratitude, indicate interest in discussing the role further, and include a professional sign-off. **Important Formatting Guidelines:** - Do not include placeholders, variable markers, or template references such as '[Job Listing Source]' or '[Company Name]'. - Do not include section headings like "Introduction," "Body," or "Closing." - Email and LinkedIn URLs should be presented as plain text without square brackets or hyperlink tags. - Exclude duplicate content such as the applicant's contact information, date. - Ensure the content is concise, aligned properly, and does not include analysis or commentary about the generated content. - Provide only the main content of the cover letter, formatted for direct insertion into a PDF, without introductory explanations or extra meta-information. - Donot include additional information in the closing part, except for greetings and candidate name`;
       const res = await fetch(
-        "http://localhost:3001/api/coverletter/generate",
+        `${process.env.NEXT_PUBLIC_API_URL}/api/coverletter/generate`,
         {
           method: "POST",
           headers: {
@@ -86,7 +86,7 @@ export default function InputForm() {
     }
     // You should charge here before enabling BYOK!
     try {
-      const res = await fetch("http://localhost:3001/api/auth/use-endpoint-key", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/use-endpoint-key`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
