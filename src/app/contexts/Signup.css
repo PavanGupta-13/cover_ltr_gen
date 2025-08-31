@@ -1,0 +1,100 @@
+.signup-form,
+.login-form {
+  max-width: 400px;
+  margin: 60px auto;
+  background: rgba(255,255,255,0.96);
+  border-radius: 18px;
+  padding: 40px 36px 32px 36px;
+  box-shadow: 0 10px 32px rgba(44,62,80,0.1), 0 2px 4px rgba(44,62,80,0.02);
+  border: 1px solid #e6e8ec;
+  font-family: 'SF Pro Display', 'Inter', 'Segoe UI', Arial, sans-serif;
+}
+
+.signup-form h2,
+.login-form h2 {
+  margin-bottom: 10px;
+  color: #273046;
+  font-weight: 600;
+  font-size: 2rem;
+}
+
+.signup-form input,
+.login-form input {
+  width: 100%;
+  background: #f5f6fa;
+  border: 1px solid #e6e8ec;
+  outline: none;
+  border-radius: 8px;
+  margin: 14px 0 0 0;
+  padding: 14px 13px;
+  font-size: 1.07rem;
+  color: #181f2c;
+  transition: border 0.2s;
+}
+
+.signup-form input:focus,
+.login-form input:focus {
+  border: 1.8px solid #4B65F3;
+  background: #f8faff;
+  box-shadow: 0 1px 8px #4B65F31a;
+}
+
+.signup-form button,
+.login-form button {
+  background: linear-gradient(90deg, #4B65F3 0%, #6db3f2 98%);
+  font-weight: 500;
+  cursor: pointer;
+  transition: box-shadow 0.2s, background 0.2s;
+  box-shadow: 0 6px 28px -6px #4B65F340;
+
+  padding: 12px 20px;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+.signup-form button:hover,
+.login-form button:hover {
+  background: linear-gradient(90deg, #536DFE 0%, #3f51b5 100%);
+  box-shadow: 0 6px 32px -7px #4B65F355;
+}
+
+.signup-form p,
+.login-form p {
+  margin-top: 17px;
+  font-size: 0.98rem;
+  color: #697491;
+  text-align: center;
+}
+
+.signup-form a,
+.login-form a,
+.signup-form button:link,
+.login-form button:link {
+  color: #4B65F3;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.signup-form .error,
+.login-form .error {
+  color: #e14c41;
+  margin-top: 10px;
+  text-align: left;
+  background: #fff5f5;
+  border-left: 3.5px solid #e14c41;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.97rem;
+}
+
+@media (max-width: 540px) {
+  .signup-form,
+  .login-form {
+    padding: 32px 8vw 26px 8vw;
+    min-width: unset;
+  }
+}
