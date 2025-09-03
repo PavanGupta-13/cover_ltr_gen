@@ -1,14 +1,16 @@
 'use client';
 import './Signup.css'
+import { useSession, signIn, signOut } from "next-auth/react";
 import React, { useState } from 'react';
-import { useAuth } from './AuthContext';
 
 export default function Signup({ onSuccess }) {
-  const { setToken, fetchUserProfile } = useAuth();
+  const { data: session, status } = useSession();
   const [form, setForm] = useState({ email: '', phone: '', password: '' });
   const [error, setError] = useState('');
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  if (session)
+    onSuccess(true)
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -24,7 +26,7 @@ export default function Signup({ onSuccess }) {
         setError(message || 'Signup failed');
         return;
       }
-      // Direct user to login since verification is usually required.
+      // Direct user to login since verification is usually required. 
       onSuccess(true);
     } catch {
       setError('Error connecting to server');
@@ -37,6 +39,7 @@ export default function Signup({ onSuccess }) {
       <input name="phone" type="tel" placeholder="Phone" value={form.phone} onChange={onChange} required />
       <input name="password" type="password" placeholder="Password" value={form.password} onChange={onChange} required minLength={6} />
       <button>Sign Up</button>
+      <button type="button" onClick={() => signIn('google')}>Sign up with Google</button>
       {error && <p style={{ color: "red" }}>{error}</p>}
     </form>
   );

@@ -87,35 +87,71 @@ button:hover {
   color: #555;
 }
 
-.upgrade-button {
-  padding: 12px 30px;
-  background-color: #28a745;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 16px;
-  margin-right: 10px;
-  transition: background-color 0.2s;
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
 }
 
-.upgrade-button:hover {
-  background-color: #218838;
+@media (min-width: 540px) {
+  .button-group {
+    flex-direction: row;
+    justify-content: center;
+    gap: 1.2rem;
+  }
+}
+
+.upgrade-button,
+.upgrade-button.alt,
+.cancel-button {
+  font-weight: 600;
+  border-radius: 9px;
+  padding: 0.85em 1.7em;
+  min-width: 210px;
+  transition: box-shadow 0.18s, border 0.15s, background 0.18s;
+  border: none;
+  box-shadow: 0 2px 12px #266bfd19;
+  outline: none;
+  cursor: pointer;
+}
+
+/* rgb(47 53 59) */
+.upgrade-button {
+  background: linear-gradient(91deg, #0a63e1 0%, #5ecbee 100%);
+  color: #fff;
+  border: 1.5px solid #197be6;
+  box-shadow: 0 2px 18px #197be624;
+}
+
+.upgrade-button.alt {
+  background: #f9fbfe;
+  color: #178bda;
+  border: 1.5px solid #b0e2fc;
+  box-shadow: 0 2px 14px #afecf887;
+}
+
+.upgrade-button.alt:hover,
+.upgrade-button.alt:focus {
+  background: #e6f7fd;
+  border-color: #83d2f4;
+}
+
+.upgrade-button:hover,
+.upgrade-button:focus {
+  background: linear-gradient(90deg, #176ff2 0%, #55bdf9 100%);
+  box-shadow: 0 3px 28px #197be635;
 }
 
 .cancel-button {
-  padding: 12px 30px;
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: background-color 0.2s;
+  background: #f4f7fa;
+  color: #7a8daa;
+  border: 1.5px solid #d1d8e6;
+  box-shadow: none;
 }
 
-.cancel-button:hover {
-  background-color: #5a6268;
+.cancel-button:hover, .cancel-button:focus {
+  background: #eef2f5;
+  border-color: #b1bacc;
 }
 
 .resume-upload {

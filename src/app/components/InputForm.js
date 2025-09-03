@@ -1,13 +1,26 @@
-'use client';
+"use client";
 
 import "./InputForm.css";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import { pdfToText } from "pdf-ts";
-import { useAuth } from "../contexts/AuthContext";
+import { useSession, signIn } from "next-auth/react";
 
 export default function InputForm() {
-  const { token, user, fetchUserProfile } = useAuth();
+  const { data: session, status } = useSession();
+
+  // Profile creation state
+  const [form, setForm] = useState({
+    fullName: "",
+    phone: "",
+  });
+  const [profileFormError, setProfileFormError] = useState(null);
+
+  // User info from backend
+  const [userProfile, setUserProfile] = useState(undefined);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  // Resume/Cover Letter states
   const [resumeFile, setResumeFile] = useState(null);
   const [resumeText, setResumeText] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -18,6 +31,185 @@ export default function InputForm() {
   const [customKey, setCustomKey] = useState("");
   const [byokError, setByokError] = useState("");
   const [downloading, setDownloading] = useState(false);
+
+  // Example for /payment-status page/component
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const referenceId = params.get("reference_id");
+
+    if (!referenceId) return;
+
+    const checkAndCompleteBYOK = async () => {
+      // 1. Query payment status from your backend
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/check-payment-status?reference_id=${referenceId}`
+      );
+      const data = await res.json();
+
+      if (data.link_status === "PAID") {
+        // 2. If user had pending BYOK flow
+        const pendingMode = window.localStorage.getItem("pending_payment_mode");
+        const pendingKey = window.localStorage.getItem("pending_byok_api_key");
+        if (pendingMode === "byok" && pendingKey) {
+          // 3. Submit BYOK key!
+          const keyRes = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/auth/use-endpoint-key`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                customApiKey: pendingKey,
+                email: session.user.email,
+              }),
+            }
+          );
+          // 4. Clear stored values regardless of success/failure
+          window.localStorage.removeItem("pending_byok_api_key");
+          window.localStorage.removeItem("pending_payment_mode");
+          // Show success, update UI/profile, etc.
+        }
+      }
+    };
+
+    checkAndCompleteBYOK();
+  }, []);
+
+  // 1. After Google sign-in, try to fetch profile info
+  useEffect(() => {
+    if (!session?.user?.email) {
+      setUserProfile(undefined);
+      return;
+    }
+    setProfileLoading(true);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: session.user.email }),
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((profile) => {
+        // Check if meaningful profile fields exist, else treat as not created
+        if (profile.fullName && profile.phone) {
+          setUserProfile(profile);
+        } else {
+          setUserProfile(null); // Profile missing info, must fill form
+        }
+        setProfileLoading(false);
+      })
+      .catch(() => {
+        setUserProfile(null); // Profile not found
+        setProfileLoading(false);
+      });
+  }, [session?.user?.email]);
+
+  // 2. Profile form handlers
+  const handleFormChange = (e) =>
+    setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleCreateProfile = async (e) => {
+    e.preventDefault();
+    if (!form.fullName || !form.phone) {
+      setProfileFormError("Please fill all fields.");
+      return;
+    }
+    setProfileFormError(null);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/profile`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: session.user.email,
+            fullName: form.fullName,
+            phone: form.phone,
+          }),
+        }
+      );
+      if (!res.ok) throw new Error("Could not create profile.");
+      const profile = await res.json();
+      setUserProfile(profile);
+    } catch {
+      setProfileFormError("Could not create profile.");
+    }
+  };
+
+  // 3. Profile UI logic
+  if (status === "loading" || profileLoading)
+    return (
+      <div>
+        {" "}
+        <img
+          src="/loadingimage.jpeg"
+          alt="Sign up illustration"
+          style={{
+            width: "180px",
+            maxWidth: "90vw",
+            borderRadius: "16px",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.05)",
+            marginBottom: "2rem",
+          }}
+        />
+      </div>
+    );
+  if (!session) {
+    // Not signed in, show Google login only
+    return (
+      <div className="profile-form">
+        <h2>Sign in to Continue</h2>
+        <img
+          src="/signinpageimage.jpeg"
+          alt="Sign up illustration"
+          style={{
+            width: "180px",
+            maxWidth: "90vw",
+            borderRadius: "16px",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.05)",
+            marginBottom: "2rem",
+          }}
+        />
+        <button onClick={() => signIn("google")}>Sign in with Google</button>
+      </div>
+    );
+  }
+  if (userProfile === null) {
+    // Signed in with Google, but no profile exists, show form
+    return (
+      <form className="profile-form" onSubmit={handleCreateProfile}>
+        <h2>Create Your Profile to Continue</h2>
+        <img
+          src="/signinpageimage.jpeg"
+          alt="Sign up illustration"
+          style={{
+            width: "180px",
+            maxWidth: "90vw",
+            borderRadius: "16px",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.05)",
+            marginBottom: "2rem",
+          }}
+        />
+        <input
+          name="fullName"
+          value={form.fullName}
+          onChange={handleFormChange}
+          placeholder="Full Name"
+          required
+        />
+        <input
+          name="phone"
+          type="tel"
+          value={form.phone}
+          onChange={handleFormChange}
+          placeholder="Phone"
+          required
+        />
+        {profileFormError && <div className="error">{profileFormError}</div>}
+        <button type="submit">Create Profile</button>
+      </form>
+    );
+  }
+
+  // ===== MAIN APP: resume upload, cover letter generation =====
 
   // Handle resume upload and parsing
   const handleFileChange = async (e) => {
@@ -37,13 +229,15 @@ export default function InputForm() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
-    setGeneratedResponse('')
+    setGeneratedResponse("");
     if (!jobDescription.trim())
       return setError("Please enter a job description.");
     if (!resumeText) return setError("No resume uploaded.");
-
-    // Quota enforcement for STANDARD MODE only
-    if (user.mode !== 'byok' && (user?.quota ?? 0) <= 0) {
+    if (
+      userProfile &&
+      userProfile.mode !== "byok" &&
+      (userProfile?.quota ?? 0) <= 0
+    ) {
       setShowPaymentPrompt(true);
       return;
     }
@@ -53,27 +247,57 @@ export default function InputForm() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/coverletter/generate`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ prompt, resumeText, jobDescription }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            resumeText,
+            jobDescription,
+            email: session.user.email,
+          }),
         }
       );
       const data = await res.json();
       if (!res.ok) return setError(data.message || "Generation failed.");
       setGeneratedResponse(data);
-      // Refresh quota or BYOK info from backend
-      await fetchUserProfile();
+      // Refresh quota info
+      if (session?.user?.email) {
+        const profileRes = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/auth/profile`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: session.user.email }),
+          }
+        );
+        setUserProfile(await profileRes.json());
+      }
       setJobDescription("");
     } catch (e) {
       setError("Error contacting server");
     }
   };
 
-  // Handle Stripe payment redirect (upgrade standard)
-  const handleUpgrade = () => {
-    window.location.href = "https://buy.stripe.com/test_YOUR_PRODUCT_ID";
+  // Stripe payment redirect (upgrade standard)
+  const handleUpgrade = async (amount = 275, mode = "regular") => {
+    // You could store `mode` in localStorage too if needed for tracking
+    window.localStorage.setItem("pending_payment_mode", mode);
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/create-payment-link`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: session.user.email,
+          amount,
+        }),
+      }
+    );
+    const data = await res.json();
+    if (data.success) {
+      window.location.href = data.paymentLink;
+    } else {
+      alert("Payment initiation failed: " + (data.error || ""));
+    }
   };
 
   // Handle BYOK (Bring Your Own Key)
@@ -84,38 +308,18 @@ export default function InputForm() {
       setByokError("Please enter a valid API key.");
       return;
     }
-    // You should charge here before enabling BYOK!
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/use-endpoint-key`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ customApiKey: customKey }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setByokError(data.message || "Failed to enable BYOK.");
-        return;
-      }
-      setShowBuyKey(false);
-      setShowPaymentPrompt(false);
-      setCustomKey("");
-      setResumeFile(null)
-      setJobDescription("")
-      await fetchUserProfile();
-    } catch {
-      setByokError("Error updating your key.");
-    }
+    // Save key in localStorage/sessionStorage or global state for post-payment
+    window.localStorage.setItem("pending_byok_api_key", customKey);
+    // Trigger payment of 500
+    await handleUpgrade(500, "byok"); // pass extra param as marker
   };
 
-  // Generate and download PDF using jsPDF
+  // Generate and download PDF
   const handleDownloadPDF = () => {
     if (!generatedResponse) return;
     setDownloading(true);
     try {
-      const userDetails = user || {};
+      const userDetails = userProfile || {};
       const filename =
         prompt("Enter filename for the cover letter (e.g., MyCoverLetter):") ||
         "MyCoverLetter";
@@ -181,34 +385,46 @@ export default function InputForm() {
     }
   };
 
+  // MAIN APP RENDER
   return (
     <div className="input-form">
       {showPaymentPrompt ? (
         <div className="payment-prompt">
           <h2>You've used all your free cover letters</h2>
-          <p className="disclaimer">Upgrade to generate unlimited cover letters.</p>
-          <button onClick={handleUpgrade} className="upgrade-button">
-            Buy More (Standard)
-          </button>
-          <button
-            onClick={() => setShowBuyKey(true)}
-            className="upgrade-button alt"
-          >
-            Enter Your Own Endpoint Key (BYOK)
-          </button>
-          <button
-            onClick={() => setShowPaymentPrompt(false)}
-            className="cancel-button"
-          >
-            Cancel
-          </button>
+          <p className="disclaimer">
+            Upgrade to generate more cover letters.
+          </p>
+          <div className="button-group">
+            <button onClick={handleUpgrade} className="upgrade-button">
+              Buy More at&nbsp; <span style={{ fontWeight: 700 }}>₹275</span>{" "}
+              <span style={{ color: "rgb(47 53 59)" }}>/ 10 Cover Letters</span>
+            </button>
+            <button
+              onClick={() => setShowBuyKey(true)}
+              className="upgrade-button alt"
+              type="button"
+            >
+              <span role="img" aria-label="key" style={{ marginRight: 8 }}>
+                🔑
+              </span>{" "}
+              Use your own AI API Key (BYOK)
+            </button>
+            <button
+              onClick={() => setShowPaymentPrompt(false)}
+              className="cancel-button"
+              type="button"
+            >
+              Cancel
+            </button>
+          </div>
+
           {showBuyKey && (
-            <form className="byok-form" onSubmit={handleBYOK}>
+            <form className="byok-form" onSubmit={handleBYOK} style={{paddingTop: '10px'}}>
               <input
                 type="text"
                 placeholder="Enter your AI API Key"
                 value={customKey}
-                onChange={e => setCustomKey(e.target.value)}
+                onChange={(e) => setCustomKey(e.target.value)}
                 className="input"
                 autoFocus
                 required
@@ -221,11 +437,11 @@ export default function InputForm() {
       ) : (
         <>
           <div className="uses-counter">
-            {user.mode === "byok" ? (
+            {userProfile?.mode === "byok" ? (
               <p>BYOK Mode: Using your own API key.</p>
             ) : (
               <p>
-                Cover letters remaining: <span>{user?.quota ?? 0}</span>
+                Cover letters remaining: <span>{userProfile?.quota ?? 0}</span>
               </p>
             )}
           </div>
